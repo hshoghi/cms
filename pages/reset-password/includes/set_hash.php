@@ -1,5 +1,9 @@
 <?php
 
+use \Sky\Model\person;
+
+$_POST['refresh'] = 1 ;
+
 $errors = array();
 
 $email = trim($_POST['email_address']);
@@ -13,9 +17,9 @@ $clause_array = array(
     'limit' => 1
 );
 
-$person = person::getByClause($clause_array);
+$person = person::getOne($clause_array);
 
-if (!$person->person_id) {
+if (!$person->id) {
     $errors[] = 'The email address you entered is not registered with us. Try creating a new account.';
 }
 
@@ -26,17 +30,26 @@ if ($errors) {
     ));
 }
 
-$re = $person->saveProperties(array(
+$re = $person->update(array(
     'password_reset_hash' => sha1(mt_rand())
 ));
 
-if ($re['status'] != 'OK') exit_json($re);
+if ($re->_errors) {
+    exit_json($re->_errors);
+}
 
 $mlr = new Mailer;
 $mlr->addTo($person->email_address)
+    ->setMethod('mandrill')
+    ->setSubject("Password Recovery")
+    ->setFrom('passwords@cravetickets.com')
+    ->addBcc('passwords@cravetickets.com')
+    ->setCredentials((object)['api'=>API_MANDRILL_SECRET])
     ->inc('includes/Mailers/reset-password.php', array(
         'person' => $person,
         'host' => $_SERVER['HTTP_HOST']
     ))->send();
-
-exit_json($re);
+exit_json([
+    'status' => 'OK',
+    'email_address' => $re->email_address
+]);

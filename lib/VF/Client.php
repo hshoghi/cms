@@ -88,7 +88,7 @@ class Client
      * @param   array
      */
     public function __construct(array $config = array())
-    {
+    {   
         $this->api_url = $config['api_url'];
         $this->oauth_token = $config['oauth_token'];
 
@@ -128,11 +128,12 @@ class Client
      */
     public function addItem(array $args = array(), $userfile = null)
     {
+
         if($userfile){
             if(is_array($userfile)){
                 $params['post'] = json_encode($args);
                 $params['files'] = json_encode($userfile);
-
+                //d($params, $args, $userfile);
                 $filename = $userfile['file']['name'];
                 $filedata = $userfile['file']['tmp_name'];
                 $filesize = $userfile['file']['size'];
@@ -312,7 +313,7 @@ class Client
                 throw new \InvalidArgumentException("Invalid args for $name");
             }
         }
-
+        //d($name, $args);
         $url = array_filter(array(
             $info->resource,
             $info->static ? null : reset($args),

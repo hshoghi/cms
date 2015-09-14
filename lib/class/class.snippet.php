@@ -48,12 +48,16 @@ class snippet {
 			$uri = $uri[0] . '?';
 			//echo $uri . ' ' . $tab_folder . '<br />';
 			if ( strpos( $uri, $tab_folder ) !== false ) return false;
-			//if ( ereg( $value . '.*', $_SERVER['REQUEST_URI'] ) ) return false;
-			//if ( ereg( str_replace('?','\?',$value) . '.*', $_SERVER['REQUEST_URI'] ) ) return false;
 		}//foreach
         $qs = explode('?',$_SERVER['REQUEST_URI']);
         $qs = $qs[1];
         if ( $qs ) $qs = '?' . $qs;
+        $url = $tabs[getArrayFirstIndex($tabs)];
+
+        if (stristr($url, '?')){
+            redirect($url,302);
+        }
+
 		redirect($tabs[getArrayFirstIndex($tabs)] . $qs,302);
 	}//function
 
@@ -259,7 +263,7 @@ class snippet {
 
 
 
-	function youtube_embed($url, $width_px = NULL, $height_px = NULL, $silent_px = NULL) {
+	static function youtube_embed($url, $width_px = NULL, $height_px = NULL, $silent_px = NULL) {
 
 		if(strpos($url,'youtu.be') == 7) {
 			$id = substr($url, 16);

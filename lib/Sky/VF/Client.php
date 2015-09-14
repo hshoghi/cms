@@ -22,14 +22,14 @@ class Client
      * [$error_cache_duration description]
      * @var string
      */
-    public static $error_cache_duration = '15 minutes';
+    public static $error_cache_duration = '35 minutes';
 
     /**
      * Sets the client with the config array
      * @param   array   $conf
      */
     public static function config($conf = array())
-    {
+    {   
         static::$client = new \VF\Client($conf);
     }
 
@@ -37,7 +37,7 @@ class Client
      * @return  \VF\Client
      */
     public static function getClient()
-    {
+    {   
         return static::$client;
     }
 
@@ -80,6 +80,7 @@ class Client
      */
     public static function getItem($id, $width = null, $height = null, $crop = null, $vf_version = null, $v2params = null)
     {
+
         if (!$id) return false;
 
         static::checkForClient();
@@ -91,14 +92,14 @@ class Client
         if (!$_GET['vf_refresh']) $cached_response = mem($memkey);
         if ($_GET['elapsed']) krumo($cached_response);
         if ($cached_response) return $cached_response;*/
-
+        //d($id);
         if($vf_version == "v2"){
             $re = static::getClient()->getItem($id, "v2", $v2params);
             //d($re);
         }else{
             $re = static::getClient()->getItem($id, $params);
         }
-        
+        //d($params, $re);
         if ($re->errors) {
             return $re;
         }
@@ -163,32 +164,37 @@ class Client
      * @param   array   $params
      * @return  \stdClass
      */
-    // due to invalid artument, the function has been changed from  : 
-    //public static function getFolder($id, array $params = array())
-    public static function getFolder($id, $params = null)
+    public static function getFolder($id, array $params = array())
     {
-        if (!is_array($params))
-            $params = array() ;
-
-        
-        global $cache_vf2_folders;
+        global $cache_vf2_folders, $cache_vf2_folders_skyphp_version;
 
         static::checkForClient();
 
         $new_params = static::prepOperations($params['width'], $params['height'], $params['crop']);
         $params = array_merge($params, $new_params);
 
+        $mem_params = null;
+        // set the mem params if we need to read vf2 cache from a different skyphp version
+        if ($cache_vf2_folders_skyphp_version) {
+            $mem_params = [
+                'sky_php_version' => $cache_vf2_folders_skyphp_version
+            ];
+        }
+
         $memkey = "vf2:getFolder:" . serialize(array($id,$params));
 
         if ($cache_vf2_folders) {
 
+
             if (!$_GET['vf_refresh']) {
-                $re = mem($memkey);
+                // read from memcached -- we might be reading a key from a different skyphp version
+                $re = \mem($memkey, '§k¥', null, $mem_params);
             }
+            
 
             // if there has been an upload to this folder since being cached, refresh it
             $last_upload_memkey = "vf2:getFolder:lastUpload:" . $id;
-            $last_upload = mem($last_upload_memkey);
+            $last_upload = \mem($last_upload_memkey, '§k¥', null, $mem_params);
 
             if (!$re->cache_time || $re->cache_time < $last_upload) {
                 elapsed($re->cache_time . ' < ' . $last_upload);
@@ -201,12 +207,6 @@ class Client
         }
 
         if (!$re) {
-
-            // connect to vf server only 10% of the time
-            //if (rand(0,9) != 9) {
-            //    return (object) array();
-            //}
-
             $re = !static::isPath($id)
                 ? static::getClient()->getFolder($id, $params)
                 : static::getClient()->getFolderByPath(array_merge(
@@ -219,10 +219,13 @@ class Client
             $save_to_mem = true;
         }
 
+
         if ($re->folder) {
             if ($save_to_mem) {
                 $re->cache_time = date('U');
-                mem($memkey, $re);
+                // save to memcached -- we might be saving to a different skyphp version
+                \mem($memkey, $re, null, $mem_params);
+
             }
             return $re->folder;
         }
@@ -231,8 +234,9 @@ class Client
         // only if this isn't already cached
         if (!$re->cache_time) {
             $re->cache_time = date('U');
-            mem($memkey, $re, static::$error_cache_duration);
+            \mem($memkey, $re, static::$error_cache_duration);
         }
+
 
         return $re;
     }

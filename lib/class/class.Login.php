@@ -1,4 +1,8 @@
-<?
+<?php
+
+use \Sky\Model\person;
+use \Sky\Model\person_cookie;
+use \Sky\AQL;
 
 class Login {
 
@@ -42,7 +46,8 @@ class Login {
 
 	public function checkLoginPath() {
 		$n = $_SERVER['SERVER_NAME'];
-		$this->login_path = reset(explode('?', $this->login_path));
+		$explode = explode('?', $this->login_path);
+		$this->login_path = reset($explode);
 		if (stripos($this->login_path, $n) === false) return;
 		if ('http://'.$n.$_SERVER['REQUEST_URI'] == $this->login_path) return;
 		$name = str_replace(array($n, 'http://'), '', $this->login_path);
@@ -62,7 +67,11 @@ class Login {
 	}
 
 	public function checkLogin() {
-		global $access_groups, $access_denied, $rs_logins;
+		global $access_groups, $access_denied, $rs_logins, $person_email_field;
+
+		if (!$person_email_field) {
+			$person_email_field = 'email_address';
+		}
 
 		if ($this->login_path) {
 			$this->checkLoginPath();
@@ -82,23 +91,35 @@ class Login {
 		$username = trim(strtolower($this->post_username));
 
 		$aql = 	"
-					person {
-						where (
-							lower(email_address) like '{$username}' or lower(username) like '{$username}'
-							and password_hash is not null
-						)
+					person { 
+						password_hash
 						order by id desc
 					}
 				";
-		$rs_logins = aql::select($aql);
+
+
+
+		$rs_logins = AQL::select($aql, 
+				['where' => 
+					"$person_email_field ilike '{$username}' or username ilike '{$username}' and password_hash is not null"
+				
+			]);
+
 		if ($this->post_password) {
 			$granted = false;
 			foreach ($rs_logins as $p) {
-				$this->person = new person($p['person_id'], null, true);
+				
+				$p->ide = encrypt($p->id, 'person');
+				
+				$this->person = $p ; // new person($p->person_id, null, true);
+
+				//dd($this->person);
 				if (!$this->person->person_id) continue;
 				if ($this->_checkLogin($this->post_password)) {
 					if (auth_person($access_groups, $this->person->person_id) || !$access_groups) {
+						$this->person = new person($p->id); 
 						$access_denied = false;
+						//dd($access_groups, $this->person->person_id, $access_denied);
 						return $this->r(array('person_ide' => $this->person->person_ide));
 					}
 				}
@@ -109,9 +130,10 @@ class Login {
 	}
 
 	public function _checkLogin($password) {
-		$salt = $this->person->generateUserSalt();
+		$salt = self::generateUserSalt($this->person->ide); //$this->person->generateUserSalt();
 		$pw = Login::generateHash($password, $salt);
 		// return ($password == $this->person->password); // temp fix while new hash algo
+		//dd($password, $salt, $pw, $this->person->password_hash);
 		return ($pw == $this->person->password_hash);
 	}
 
@@ -124,7 +146,7 @@ class Login {
 			'lname' => $this->person->lname,
 			'email' => $this->person->email_address
 		);
-		$this->person->updateLastLoginTime();
+		#$this->person->updateLastLoginTime();
 		//Login::mset($login);
 		$_SESSION['login'] = $login;
 		if ($this->post_remember_me) {
@@ -151,7 +173,7 @@ class Login {
 		return is_numeric($id) ? $ide : '_login';
 	}
 
-	public function unsetLogin() {
+	public static function unsetLogin() {
 		//Login::$session = array();
 		$o = person_cookie::getByCookie();
 		if ($o) $o->delete();
@@ -192,7 +214,7 @@ class Login {
 		return crypt($password.$salt, $prefix.$salt.Login::GetGlobalSalt().$suffix);
 	}
 
-	public function getGlobalSalt() {
+	public static function getGlobalSalt() {
 		global $person_encryption_key;
 		return $person_encryption_key;
 	}
