@@ -106,6 +106,32 @@ class ImageManager
         return false;
     }
 
+
+  /**
+    * Get a single venue image from the new system, with featured as priority
+    * This system uses imgix for image manipulation
+    */
+    public static function get_site_banner($venueide, $w, $h, $site = NULL){
+           global $vfolder_base_url;
+    
+        $imgix_base = $vfolder_base_url;
+        $imgix_w = "";
+        $imgix_h = "";
+        if(!is_null($params['width'])){
+            $imgix_w = "&amp;w=".$params['width'];
+        }
+        if(!is_null($params['height'])){
+            $imgix_h = "&amp;h=".$params['height'];
+        }
+        $imgix_params = "?fit=crop".$imgix_w.$imgix_h;
+
+        $media = json_decode($params['media_items']);
+
+
+        return false;
+    }
+
+
     /**
     * Get venue image imgix url
     * Must pass a single $image object from a media_items array
